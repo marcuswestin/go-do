@@ -40,7 +40,7 @@ func (p *promise) Wait() error {
 	return <-p.ch
 }
 func (p *promise) Check() (error, bool) {
-	return NonBlockingReadErr(p.ch)
+	return NonBlockingChannelReadErr(p.ch)
 }
 
 // Resolve must only be called once. After Resolve has been called, any call to Reject will panic.

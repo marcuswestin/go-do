@@ -1,16 +1,13 @@
 package do
 
 import (
-	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
+	"log"
+	"runtime/debug"
+	"strings"
 )
-
-type Context context.Context
-type GenWorkFn func(workCh chan<- interface{}) error
-type DoWorkFn func(workItem interface{}) error
-type LoopFn func(i int) error
 
 // Async executes a function asyncronously, and returns a channel
 // which will contain the functions return error value. If the
@@ -30,71 +27,53 @@ func Async(fn func() error) chan error {
 	return ch
 }
 
-// WaitForErrorChannels will wait to receive a value from each given channel.
-// If any received value is a non-nil error, WaitForErrorChannels returns
-// immediately with that given error value (and stops reading from all channels).
-// If the given context is cancelled, WaitForErrorChannels returns immediately
-// with the context.Err() value.
-func WaitForErrorChannels(ctx Context, channels ...<-chan error) (err error) {
-	cases := make([]reflect.SelectCase, len(channels)+1)
-	ctxDoneCaseIndex := len(channels)
-	for i, ch := range channels {
-		cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
-	}
-	if ctx != nil {
-		cases[ctxDoneCaseIndex] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ctx.Done())}
-	}
+// RecoverPanic will recover from panics, and will assign the given *error pointer
+// with an informative error, including the panic message and a stack trace. You
+// should call RecoverPanic with defer, and pass it a pointer to the function's
+// error return value. Example usage:
+//
+// 	func DoSomething() (err error) {
+// 		defer do.RecoverPanic(&err)
+//		...
+// 		// The following panic will not bubble up to the called of DoSomething.
+// 		// Instead, DoSomething will return an error with a message that
+// 		// contains "Oh no!!", as well as a stack trace to this line.
+// 		panic("Oh no!!")
+// 	}
+func RecoverPanic(err *error) {
+	*err = recoverError()
+}
 
-	remaining := len(channels)
-	for remaining > 0 {
-		i, value, ok := reflect.Select(cases)
+type panicError struct {
+	Stack   string
+	Message string
+}
 
-		// Catch error cases and return early
-		if i == ctxDoneCaseIndex {
-			// Context was cancelled
-			return ctx.Err()
+func (p *panicError) Error() string {
+	return p.Message
+}
 
-		} else if !value.IsNil() {
-			// Channel received an error
-			return value.Interface().(error)
-
-		} else if !ok {
-			// Channel was closed
-			return errors.New(fmt.Sprintf("WaitForErrorChannels attempted read from closed channel #%d", i))
+func recoverError() error {
+	recovery := recover()
+	if recovery == nil {
+		return nil
+	} else {
+		var msg string
+		switch recovery := recovery.(type) {
+		case error:
+			msg = recovery.Error()
+		default:
+			msg = fmt.Sprint(recovery)
 		}
+		stack := string(debug.Stack())
+		lines := strings.Split(stack, "\n")
+		stack = lines[0] + "\n[ ... debug.Stack, do.RecoverPanic, panic ...]\n" + strings.Join(lines[7:], "\n")
 
-		// Set this channel to nil so that we don't read from it twice.
-		cases[i].Chan = reflect.ValueOf(nil)
-		remaining -= 1
+		log.Printf("do.RecoverPanic recovered panic:\nError: \"%s\"\nStack: %s", msg, stack)
+		bytes, _ := json.Marshal(&panicError{
+			Stack:   string(debug.Stack()),
+			Message: "Recovered panic: " + msg,
+		})
+		return errors.New(string(bytes))
 	}
-	return nil
-}
-
-// NonBlockingRead does one non-blocking read from errChan. If there was a value to be
-// read from channel it is returned, along with didRead=true; or else nil and didRead=false.
-func NonBlockingRead(channel chan interface{}) (item interface{}, didRead bool) {
-	return nonBlockingRead(channel)
-}
-
-// NonBlockingReadErr does one non-blocking read from errChan. If there was an error to be
-// read from errChan it is returned, along with didRead=true; or else nil and didRead=false.
-func NonBlockingReadErr(errChan chan error) (err error, didRead bool) {
-	val, didRead := nonBlockingRead(errChan)
-	return val.(error), didRead
-}
-
-// NonBlockingReadStruct does one non-blocking read from channel. If there was a message to be
-// read from channel it returns didRead=true; or else didRead=false.
-func NonBlockingReadStruct(channel chan struct{}) (didRead bool) {
-	_, didRead = nonBlockingRead(channel)
-	return didRead
-}
-
-func nonBlockingRead(channel interface{}) (item interface{}, didRead bool) {
-	rCase := reflect.SelectCase{
-		Chan: reflect.ValueOf(channel),
-		Dir:  reflect.SelectRecv,
-	}
-	_, value, didRead := reflect.Select([]reflect.SelectCase{rCase})
-	return value.Interface(), didRead
 }
