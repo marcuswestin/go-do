@@ -46,22 +46,22 @@ func WaitForErrorChannels(ctx Context, channels ...<-chan error) (err error) {
 	return nil
 }
 
-// NonBlockingChannelRead does one non-blocking read from errChan. If there was a value to be
+// CheckChan does one non-blocking read from errChan. If there was a value to be
 // read from channel it is returned, along with didRead=true; or else nil and didRead=false.
-func NonBlockingChannelRead(channel chan interface{}) (item interface{}, didRead bool) {
+func CheckChan(channel chan interface{}) (item interface{}, didRead bool) {
 	return nonBlockingChannelRead(channel)
 }
 
-// NonBlockingChannelReadErr does one non-blocking read from errChan. If there was an error to be
+// CheckErrChan does one non-blocking read from errChan. If there was an error to be
 // read from errChan it is returned, along with didRead=true; or else nil and didRead=false.
-func NonBlockingChannelReadErr(errChan chan error) (err error, didRead bool) {
+func CheckErrChan(errChan chan error) (err error, didRead bool) {
 	val, didRead := nonBlockingChannelRead(errChan)
 	return val.(error), didRead
 }
 
-// NonBlockingChannelReadStruct does one non-blocking read from channel. If there was a message to be
+// CheckStructChan does one non-blocking read from channel. If there was a message to be
 // read from channel it returns didRead=true; or else didRead=false.
-func NonBlockingChannelReadStruct(channel chan struct{}) (didRead bool) {
+func CheckStructChan(channel chan struct{}) (didRead bool) {
 	_, didRead = nonBlockingChannelRead(channel)
 	return didRead
 }
