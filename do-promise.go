@@ -5,15 +5,18 @@ import (
 	"sync"
 )
 
+// Promise allows you to wait for an operation to complete, and then check its
+// result multiple times.
 type Promise interface {
 	Wait() error
 	WaitCh() <-chan error
 	Get() (resolvedValue interface{})
 	Resolve(value interface{})
 	Reject(err error)
-	Check() (error, bool)
+	Check() (bool, error)
 }
 
+// NewPromise creates a Promise
 func NewPromise() Promise {
 	return &promise{sync.Mutex{}, make(chan error), nil, nil, false}
 }
@@ -39,7 +42,7 @@ func (p *promise) WaitCh() <-chan error {
 func (p *promise) Wait() error {
 	return <-p.ch
 }
-func (p *promise) Check() (error, bool) {
+func (p *promise) Check() (bool, error) {
 	return CheckErrChan(p.ch)
 }
 

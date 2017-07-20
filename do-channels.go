@@ -1,7 +1,6 @@
 package do
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 )
@@ -36,41 +35,41 @@ func WaitForErrorChannels(ctx Context, channels ...<-chan error) (err error) {
 
 		} else if !ok {
 			// Channel was closed
-			return errors.New(fmt.Sprintf("WaitForErrorChannels attempted read from closed channel #%d", i))
+			return fmt.Errorf("WaitForErrorChannels attempted read from closed channel #%d", i)
 		}
 
 		// Set this channel to nil so that we don't read from it twice.
 		cases[i].Chan = reflect.ValueOf(nil)
-		remaining -= 1
+		remaining--
 	}
 	return nil
 }
 
 // CheckChan does one non-blocking read from errChan. If there was a value to be
 // read from channel it is returned, along with didRead=true; or else nil and didRead=false.
-func CheckChan(channel chan interface{}) (item interface{}, didRead bool) {
+func CheckChan(channel chan interface{}) (didRead bool, item interface{}) {
 	return nonBlockingChannelRead(channel)
 }
 
 // CheckErrChan does one non-blocking read from errChan. If there was an error to be
 // read from errChan it is returned, along with didRead=true; or else nil and didRead=false.
-func CheckErrChan(errChan chan error) (err error, didRead bool) {
-	val, didRead := nonBlockingChannelRead(errChan)
-	return val.(error), didRead
+func CheckErrChan(errChan chan error) (didRead bool, err error) {
+	didRead, val := nonBlockingChannelRead(errChan)
+	return didRead, val.(error)
 }
 
 // CheckStructChan does one non-blocking read from channel. If there was a message to be
 // read from channel it returns didRead=true; or else didRead=false.
 func CheckStructChan(channel chan struct{}) (didRead bool) {
-	_, didRead = nonBlockingChannelRead(channel)
+	didRead, _ = nonBlockingChannelRead(channel)
 	return didRead
 }
 
-func nonBlockingChannelRead(channel interface{}) (item interface{}, didRead bool) {
+func nonBlockingChannelRead(channel interface{}) (didRead bool, item interface{}) {
 	rCase := reflect.SelectCase{
 		Chan: reflect.ValueOf(channel),
 		Dir:  reflect.SelectRecv,
 	}
 	_, value, didRead := reflect.Select([]reflect.SelectCase{rCase})
-	return value.Interface(), didRead
+	return didRead, value.Interface()
 }

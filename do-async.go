@@ -18,7 +18,7 @@ func Async(fn func() error) chan error {
 	ch := make(chan error)
 	go func() {
 		defer func() {
-			if err := recoverError(); err != nil {
+			if err := recoverError(recover()); err != nil {
 				ch <- err
 			}
 		}()
@@ -41,8 +41,12 @@ func Async(fn func() error) chan error {
 // 		panic("Oh no!!")
 // 	}
 func RecoverPanic(err *error) {
-	*err = recoverError()
+	*err = recoverError(recover())
 }
+
+// LogPanics - if true, do.Async and do.RecoverPanic will log.Printf an informative
+// debug message for every recovered panic, including the panic message and stack trace.
+var LogPanics = false
 
 type panicError struct {
 	Stack   string
@@ -53,27 +57,27 @@ func (p *panicError) Error() string {
 	return p.Message
 }
 
-func recoverError() error {
-	recovery := recover()
+func recoverError(recovery interface{}) error {
 	if recovery == nil {
 		return nil
-	} else {
-		var msg string
-		switch recovery := recovery.(type) {
-		case error:
-			msg = recovery.Error()
-		default:
-			msg = fmt.Sprint(recovery)
-		}
-		stack := string(debug.Stack())
-		lines := strings.Split(stack, "\n")
-		stack = lines[0] + "\n[ ... debug.Stack, do.RecoverPanic, panic ...]\n" + strings.Join(lines[7:], "\n")
-
-		log.Printf("do.RecoverPanic recovered panic:\nError: \"%s\"\nStack: %s", msg, stack)
-		bytes, _ := json.Marshal(&panicError{
-			Stack:   string(debug.Stack()),
-			Message: "Recovered panic: " + msg,
-		})
-		return errors.New(string(bytes))
 	}
+	var msg string
+	switch recovery := recovery.(type) {
+	case error:
+		msg = recovery.Error()
+	default:
+		msg = fmt.Sprint(recovery)
+	}
+	stack := string(debug.Stack())
+	lines := strings.Split(stack, "\n")
+	stack = lines[0] + "\n[ ... debug.Stack, do.RecoverPanic, panic ...]\n" + strings.Join(lines[7:], "\n")
+
+	if LogPanics {
+		log.Printf("do.RecoverPanic recovered panic:\nError: \"%s\"\nStack: %s", msg, stack)
+	}
+	bytes, _ := json.Marshal(&panicError{
+		Stack:   string(debug.Stack()),
+		Message: "Recovered panic: " + msg,
+	})
+	return errors.New(string(bytes))
 }

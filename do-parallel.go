@@ -1,9 +1,9 @@
 package do
 
 // ParallelWork will call the genWorkFn asynchronously, and expects it to generate work items.
-// It then calls the DoWorkFn once for each generated work item, and ensures that at most numParallel
+// It then calls the WorkFn once for each generated work item, and ensures that at most numParallel
 // invocations of the work function are running in parallel.
-func ParallelWork(ctx Context, numParallel int, genWorkFn GenWorkFn, doWorkFn DoWorkFn) chan error {
+func ParallelWork(ctx Context, numParallel int, genWorkFn GenWorkFn, doWorkFn WorkFn) chan error {
 	return Async(func() error {
 		workChan := make(chan interface{})
 		genErrCh := Async(func() error {
@@ -20,7 +20,7 @@ func ParallelWork(ctx Context, numParallel int, genWorkFn GenWorkFn, doWorkFn Do
 // each item read. There will be at most numParallel invocations of workFn at any given time.
 // If any workFn returns a non-nil error, ParallelRead will stop reading values from channel
 // and return the error (any errors of already invoked parallel workFns are simply ignored).
-func ParallelRead(ctx Context, channel <-chan interface{}, numParallel int, workFn DoWorkFn) <-chan error {
+func ParallelRead(ctx Context, channel <-chan interface{}, numParallel int, workFn WorkFn) <-chan error {
 	parallelWorkPool := NewParallelWorkPool(ctx, channel, numParallel)
 
 	go func() {
@@ -41,7 +41,7 @@ func ParallelRead(ctx Context, channel <-chan interface{}, numParallel int, work
 // ParallelLoop will call the given loopFn numItems times, with i ranging from
 // 0 to numItems. There will be at most numParallel invocations of loopFn at any
 // given time.
-func ParallelLoop(ctx Context, numItems, numParallel int, loopFn LoopFn) <-chan error {
+func ParallelLoop(ctx Context, numItems, numParallel int, loopFn func(i int) error) <-chan error {
 	loopCh := make(chan interface{})
 	go func() {
 		for i := 0; i < numItems; i++ {

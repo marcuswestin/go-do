@@ -57,8 +57,7 @@ func NewParallelWorkPool(ctx Context, inputChannel <-chan interface{}, numParall
 	promise := NewPromise()
 	workChannel := make(chan interface{}, numParallel)
 	poolChannel := make(chan struct{}, numParallel)
-	wg := sync.WaitGroup{}
-	workPool := &parallelWorkPool{promise, workChannel, poolChannel, wg}
+	workPool := &parallelWorkPool{promise, workChannel, poolChannel, sync.WaitGroup{}}
 
 	// Seed work pool - these are async since poolChannel is buffered
 	for i := 0; i < numParallel; i++ {
