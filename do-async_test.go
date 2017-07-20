@@ -12,7 +12,7 @@ import (
 
 var ctx = context.Background()
 
-func ExampleAsyncParallel() {
+func Example() {
 	errCh1 := do.Async(func() error {
 		time.Sleep(1 * time.Millisecond)
 		fmt.Println("Hello 1")
@@ -41,7 +41,7 @@ func ExampleAsyncParallel() {
 	// Hello after
 }
 
-func ExampleAsyncRecover() {
+func ExampleRecoverPanic() {
 	panicCh := do.Async(func() error {
 		panic("Hello 1 panic")
 	})
