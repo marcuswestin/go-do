@@ -1,4 +1,5 @@
-test: test-go-all
+test:
+	bash test.sh
 
 GO_PACKAGES := .
 test-go-all: lint-go vet-go test-go-serial test-go-race
