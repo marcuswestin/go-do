@@ -14,7 +14,7 @@ import (
 // function panics, Async recovers the panic and sends an error
 // containing the panic error message and stack trace to the
 // returned channel.
-func Async(fn func() error) chan error {
+func Async(fn func() error) <-chan error {
 	ch := make(chan error)
 	go func() {
 		defer func() {
